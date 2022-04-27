@@ -18,6 +18,8 @@
 #define MAX_FILES        10
 #define MAX_FILENAME_LEN 255
 
+
+
 struct peer_entry {
    uint32_t id; // ID of peer
    int socket_descriptor; // Socket descriptor for connection to peer
@@ -25,6 +27,21 @@ struct peer_entry {
    struct sockaddr_in address; // Contains IP address and port number
 };
 
+
+void joinFunction(int s, struct peer_entry *peer){
+      struct sockaddr_in addr;
+      socklen_t len = sizeof(addr);
+      int ret = getpeername(s, (struct sockaddr*)&addr, &len);
+      if(ret<0){
+         perror("getpeername");
+         exit(EXIT_FAILURE);
+      }
+      printf("Peer IP address: %s\n", inet_ntoa(addr.sin_addr));
+      printf("Peer port      : %d\n", ntohs(addr.sin_port));
+      peer->socket_descriptor = s;
+      peer->address.sin_addr = addr.sin_addr;
+      peer->address.sin_port = addr.sin_port;
+}
 
 
 main (int argc, char *argv[])
@@ -36,12 +53,13 @@ main (int argc, char *argv[])
    char   buffer[80];
    struct sockaddr_in   addr;
    fd_set master_set, working_set;
-   struct peer_entry peers[5];
+   struct peer_entry peer[5] ={0};
+   int addrlen = sizeof(addr);
    /*************************************************************/
    /* Create an AF_INET6 stream socket to receive incoming      */
    /* connections on                                            */
    /*************************************************************/
-   listen_sd = socket(AF_INET6, SOCK_STREAM, 0);
+   listen_sd = socket(AF_INET, SOCK_STREAM, 0);
    if (listen_sd < 0)
    {
       perror("socket() failed");
@@ -51,8 +69,7 @@ main (int argc, char *argv[])
    /*************************************************************/
    /* Allow socket descriptor to be reuseable                   */
    /*************************************************************/
-   rc = setsockopt(listen_sd, SOL_SOCKET,  SO_REUSEADDR,
-                   (char *)&on, sizeof(on));
+   rc = setsockopt(listen_sd, SOL_SOCKET,  SO_REUSEADDR, (char *)&on, sizeof(on));
    if (rc < 0)
    {
       perror("setsockopt() failed");
@@ -82,7 +99,7 @@ main (int argc, char *argv[])
       addr.sin_addr.s_addr = INADDR_ANY;
       addr.sin_port = htons(SERVER_PORT);
 
-   rc = bind(listen_sd, (struct sockaddr *)&addr, sizeof(addr));
+   rc = bind(listen_sd, (struct sockaddr*)&addr,sizeof(addr));
    if (rc < 0)
    {
       perror("bind() failed");
@@ -112,6 +129,7 @@ main (int argc, char *argv[])
    /* Loop waiting for incoming connects or for incoming data   */
    /* on any of the connected sockets.                          */
    /*************************************************************/
+   int num_peer = 0;
    do
    {
       /**********************************************************/
@@ -131,15 +149,6 @@ main (int argc, char *argv[])
       if (rc < 0)
       {
          perror("  select() failed");
-         break;
-      }
-
-      /**********************************************************/
-      /* Check to see if the 3 minute time out expired.         */
-      /**********************************************************/
-      if (rc == 0)
-      {
-         printf("  select() timed out.  End program.\n");
          break;
       }
 
@@ -184,7 +193,7 @@ main (int argc, char *argv[])
                   /* failure on accept will cause us to end the */
                   /* server.                                    */
                   /**********************************************/
-                  new_sd = accept(listen_sd, NULL, NULL);
+                  new_sd = accept(listen_sd, (struct sockaddr*)&addr,(socklen_t*)&addrlen);
                   if (new_sd < 0)
                   {
                      if (errno != EWOULDBLOCK)
@@ -239,8 +248,20 @@ main (int argc, char *argv[])
                memcpy(&action, buffer, 1);
                memcpy(&peerID, buffer+1, 4);
                peerID = ntohl(peerID);
-               if(action ==0)
-                  printf("TEST] JOIN %d\n", peerID);
+               if(action ==0 && len>0){
+                  int process =TRUE;
+                  for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+                     if(peer[j].socket_descriptor==i) process=FALSE;
+                  }
+                  if(process){
+                     printf("TEST] JOIN %d\n", peerID);
+                     peer[num_peer].id = peerID;
+                     joinFunction(i,&peer[num_peer]);
+                     num_peer++;
+                  }else{
+                     puts("Already joined\n");
+                  }
+               }
                else if(action==1){
                   printf("TEST] PUBLISH\n");
                }else if (action==2){
@@ -257,6 +278,17 @@ main (int argc, char *argv[])
                 
                 if (close_conn)
                 {
+                   struct peer_entry temp[5] = {0};
+                  //   printf("%d\n", i);
+                     int _count=0;
+                     for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+                        if(peer[j].socket_descriptor != i){
+                           temp[_count] = peer[j];
+                           _count++;
+                        }
+                     }
+                    num_peer--;
+                    memcpy(&peer, &temp, sizeof(temp));
                     close(i);
                     FD_CLR(i, &master_set);
                     if (i == max_sd)
@@ -265,81 +297,12 @@ main (int argc, char *argv[])
                             max_sd -= 1;
                     }
                 }
-
-
-
-            //    do
-            //    {
-            //       /**********************************************/
-            //       /* Receive data on this connection until the  */
-            //       /* recv fails with EWOULDBLOCK.  If any other */
-            //       /* failure occurs, we will close the          */
-            //       /* connection.                                */
-            //       /**********************************************/
-            //       rc = recv(i, buffer, sizeof(buffer), 0);
-            //       if (rc < 0)
-            //       {
-            //          if (errno != EWOULDBLOCK)
-            //          {
-            //             perror("  recv() failed");
-            //             close_conn = TRUE;
-            //          }
-            //          break;
-            //       }
-
-            //       /**********************************************/
-            //       /* Check to see if the connection has been    */
-            //       /* closed by the client                       */
-            //       /**********************************************/
-            //       if (rc == 0)
-            //       {
-            //          printf("  Connection closed\n");
-            //          close_conn = TRUE;
-            //          break;
-            //       }
-
-            //       /**********************************************/
-            //       /* Data was received                          */
-            //       /**********************************************/
-            //       len = rc;
-            //       printf("  %d bytes received\n", len);
-
-            //       /**********************************************/
-            //       /* Echo the data back to the client           */
-            //       /**********************************************/
-            //       rc = send(i, buffer, len, 0);
-            //       if (rc < 0)
-            //       {
-            //          perror("  send() failed");
-            //          close_conn = TRUE;
-            //          break;
-            //       }
-
-            //    } while (TRUE);
-
-               /*************************************************/
-               /* If the close_conn flag was turned on, we need */
-               /* to clean up this active connection.  This     */
-               /* clean up process includes removing the        */
-               /* descriptor from the master set and            */
-               /* determining the new maximum descriptor value  */
-               /* based on the bits that are still turned on in */
-               /* the master set.                               */
-               /*************************************************/
-            //    if (close_conn)
-            //    {
-            //       close(i);
-            //       FD_CLR(i, &master_set);
-            //       if (i == max_sd)
-            //       {
-            //          while (FD_ISSET(max_sd, &master_set) == FALSE)
-            //             max_sd -= 1;
-            //       }
-            //    }
             } /* End of existing connection is readable */
          } /* End of if (FD_ISSET(i, &working_set)) */
+         // for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+         //       printf("%d\n",peer[j].socket_descriptor);
+         // }
       } /* End of loop through selectable descriptors */
-
    } while (end_server == FALSE);
 
    /*************************************************************/
