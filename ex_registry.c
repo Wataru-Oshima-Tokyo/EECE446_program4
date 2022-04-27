@@ -43,6 +43,29 @@ void joinFunction(int s, struct peer_entry *peer){
       peer->address.sin_port = addr.sin_port;
 }
 
+void searchFunction(struct peer_entry *peer, char _buffer[512]){
+      int file_count=0;
+      char temp[255];
+      int size = 0;
+      memcpy(temp, _buffer+5, strlen(_buffer+5));
+      memcpy(&file_count, _buffer+1,4);
+      file_count = htonl(file_count);
+      printf("%d\n", file_count);
+      int _length=strlen(_buffer+5);
+      for(int j=0; j<file_count;j++){
+         // for(int n=0; n<_length;n++){
+         //    printf("%c", temp[n]);
+         // }
+         printf("Length %d\n",_length);
+         _length = strlen(_buff+_length+1);
+         // printf("size %d\n", size);
+         // memcpy(&temp, _buffer+size, size);
+         // _length = size -_length;
+         
+      }
+      
+
+}
 
 main (int argc, char *argv[])
 {
@@ -50,7 +73,7 @@ main (int argc, char *argv[])
    int    listen_sd, max_sd, new_sd;
    int    desc_ready, end_server = FALSE;
    int    close_conn;
-   char   buffer[80];
+   char   buffer[512];
    struct sockaddr_in   addr;
    fd_set master_set, working_set;
    struct peer_entry peer[5] ={0};
@@ -242,13 +265,13 @@ main (int argc, char *argv[])
                     }
                     break;
                 }
-                len = rc;
+               len = rc;
                uint16_t action;
                uint32_t peerID;
                memcpy(&action, buffer, 1);
-               memcpy(&peerID, buffer+1, 4);
-               peerID = ntohl(peerID);
                if(action ==0 && len>0){
+                  memcpy(&peerID, buffer+1, 4);
+                  peerID = ntohl(peerID);
                   int process =TRUE;
                   for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
                      if(peer[j].socket_descriptor==i) process=FALSE;
@@ -264,6 +287,19 @@ main (int argc, char *argv[])
                }
                else if(action==1){
                   printf("TEST] PUBLISH\n");
+                  int process =FALSE;
+                  int temp_peer_num=0;
+                  for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+                     if(peer[j].socket_descriptor==i){
+                        process=TRUE;
+                        temp_peer_num =j;
+                     } 
+                  }
+                  if(process){
+                     searchFunction(&peer[temp_peer_num], buffer);
+                  }else{
+                     puts("The peer is not joined yet\n");
+                  }
                }else if (action==2){
                   printf("TEST] SEARCH\n");
                }
