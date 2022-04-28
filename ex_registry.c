@@ -43,7 +43,7 @@ void joinFunction(int s, struct peer_entry *peer){
       peer->address.sin_port = addr.sin_port;
 }
 
-void searchFunction(struct peer_entry *peer, char _buffer[512]){
+void publishFunction(struct peer_entry *peer, char _buffer[512]){
       int file_count=0;
       char temp[255];
       int size = 0;
@@ -296,7 +296,7 @@ main (int argc, char *argv[])
                      } 
                   }
                   if(process){
-                     searchFunction(&peer[temp_peer_num], buffer);
+                     publishFunction(&peer[temp_peer_num], buffer);
                   }else{
                      puts("The peer is not joined yet\n");
                   }
