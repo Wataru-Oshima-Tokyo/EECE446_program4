@@ -40,7 +40,8 @@ void joinFunction(int s, struct peer_entry *peer){
       printf("Peer port      : %d\n", ntohs(addr.sin_port));
       peer->socket_descriptor = s;
       peer->address.sin_addr = addr.sin_addr;
-      peer->address.sin_port = addr.sin_port;
+      // peer->address.sin_port = addr.sin_port;
+      peer->address.sin_port = ntohs(addr.sin_port);
 }
 
 void publishFunction(struct peer_entry *peer, char _buffer[512]){
@@ -61,22 +62,17 @@ void publishFunction(struct peer_entry *peer, char _buffer[512]){
       }
 }
 
-int searchFunction(struct peer_entry *peer, char _buffer[512]){
+int searchFunction(struct peer_entry *peer, char _buffer[]){
       int file_count=0;
-      char search_file[255];
+      char search_file[1024];
+      memcpy(&file_count, _buffer+1,4);
       // memcpy(temp, _buffer+5, strlen(_buffer+5));
       memcpy(&search_file, _buffer+1, strlen(_buffer+1));
-      printf("%s\n", search_file);
-
-      // int n=0;
-      // int total_len = 5;
-      // int _length=strlen(_buffer+5);
-      // for(int j=0; j<file_count;j++){
-      //    memcpy(&peer->files[j], _buffer+total_len, _length);
-      //    total_len +=_length+1;
-      //    _length = strlen(_buffer+total_len);
-      //    printf("the next Length %d\n", _length);
-      // }
+      // printf("%s\n", search_file);
+      for(int j =0; j<(sizeof(peer->files)/sizeof(peer->files[0])); j++){
+         if(strcmp(search_file,peer->files[j]))
+            return 1;
+      }
       return 0;
 }
 
@@ -317,45 +313,31 @@ main (int argc, char *argv[])
                   printf("TEST] SEARCH\n");
                   int fnum=-1;
                   for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
-                   fnum = searchFunction(&peer[j],buffer);
-                  }
-                  fnum=0;
-                  if(fnum>=0){
-                     char sendData[10];
-                     int peerID = htonl(peer[fnum].id);
-                     char addr_str[INET_ADDRSTRLEN];
-                     // char port_str[10];
-                     // store this IP address in sa:
-                     // inet_pton(AF_INET, "192.0.2.33", &(sa.sin_addr));
+                   if(searchFunction(&peer[j],buffer)>0){
+                      fnum =j;
+                      break;
+                   }
 
-                     // now get it back and print it
+                  }
+                  char sendData[10];
+                  int size = sizeof(sendData);
+                  if(fnum>=0){
+                     int peerID = htonl(peer[fnum].id);
+                     int port = htons(peer[fnum].address.sin_port);
+                     char addr_str[INET_ADDRSTRLEN];
                      inet_ntop(AF_INET, &(peer[fnum].address.sin_addr), addr_str, INET_ADDRSTRLEN);
-                     
                      memcpy(sendData, &peerID, 4);
-                     memcpy(sendData+4, &addr_str, 4);
-                     memcpy(sendData+8, ntohs(peer[fnum].address.sin_port), 2);
-                     // memcpy(sendData+4,&peer[fnum].address.sin_addr,4);
-                     memcpy(sendData+8, &peer[fnum].address.sin_port, 2);
-                     // printf("%d\n", peer[fnum].id);
-                     // printf("%d\n", ntohs(peer[fnum].address.sin_port));
-                     // printf("%s\n", inet_ntoa(peer[fnum].address.sin_addr));
-                     // printf("%d\n", sendData[4]);
-                     // printf("%d\n", sendData[3]);
-                     for(int i=0; i<10;i++){
-                        printf("%d\n", sendData[i]);
-                     }
-                     int size = sizeof(sendData);
-                     if((sendall(new_sd, sendData, &size)) == -1)
-                        {
-                                 printf("error\n");
-                                 exit(1);
-                        }
+                     memcpy(sendData+4, &(peer[fnum].address.sin_addr), 4);
+                     memcpy(sendData+8, &port, 2);
+
+                  }
+                  if((sendall(i, sendData, &size)) == -1)
+                  {
+                           printf("error\n");
+                           exit(1);
                   }
                }
-               // memcpy(&ipAddr, buffer+4, 4);
-               // memcpy(&port, buffer+8, 2);
-               //  printf("%d\n",peerID);
-                printf("  %d bytes received\n", len);
+               //  printf("  %d bytes received\n", len);
                 if(rc==0){
                     printf("  Connection closed\n");
                     close_conn = TRUE;
