@@ -19,7 +19,7 @@
 #define MAX_FILENAME_LEN 255
 
 
-
+int sendall(int s, char* buf, int* len);
 struct peer_entry {
    uint32_t id; // ID of peer
    int socket_descriptor; // Socket descriptor for connection to peer
@@ -45,26 +45,39 @@ void joinFunction(int s, struct peer_entry *peer){
 
 void publishFunction(struct peer_entry *peer, char _buffer[512]){
       int file_count=0;
-      char temp[255];
-      int size = 0;
-      memcpy(temp, _buffer+5, strlen(_buffer+5));
+      // char temp[255];
+      // memcpy(temp, _buffer+5, strlen(_buffer+5));
       memcpy(&file_count, _buffer+1,4);
       file_count = htonl(file_count);
       printf("%d\n", file_count);
+      // int n=0;
+      int total_len = 5;
       int _length=strlen(_buffer+5);
       for(int j=0; j<file_count;j++){
-         // for(int n=0; n<_length;n++){
-         //    printf("%c", temp[n]);
-         // }
-         printf("Length %d\n",_length);
-         _length = strlen(_buffer+_length+1);
-         // printf("size %d\n", size);
-         // memcpy(&temp, _buffer+size, size);
-         // _length = size -_length;
-         
+         memcpy(&peer->files[j], _buffer+total_len, _length);
+         total_len +=_length+1;
+         _length = strlen(_buffer+total_len);
+         printf("the next Length %d\n", _length);
       }
-      
+}
 
+int searchFunction(struct peer_entry *peer, char _buffer[512]){
+      int file_count=0;
+      char search_file[255];
+      // memcpy(temp, _buffer+5, strlen(_buffer+5));
+      memcpy(&search_file, _buffer+1, strlen(_buffer+1));
+      printf("%s\n", search_file);
+
+      // int n=0;
+      // int total_len = 5;
+      // int _length=strlen(_buffer+5);
+      // for(int j=0; j<file_count;j++){
+      //    memcpy(&peer->files[j], _buffer+total_len, _length);
+      //    total_len +=_length+1;
+      //    _length = strlen(_buffer+total_len);
+      //    printf("the next Length %d\n", _length);
+      // }
+      return 0;
 }
 
 main (int argc, char *argv[])
@@ -302,6 +315,42 @@ main (int argc, char *argv[])
                   }
                }else if (action==2){
                   printf("TEST] SEARCH\n");
+                  int fnum=-1;
+                  for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+                   fnum = searchFunction(&peer[j],buffer);
+                  }
+                  fnum=0;
+                  if(fnum>=0){
+                     char sendData[10];
+                     int peerID = htonl(peer[fnum].id);
+                     char addr_str[INET_ADDRSTRLEN];
+                     // char port_str[10];
+                     // store this IP address in sa:
+                     // inet_pton(AF_INET, "192.0.2.33", &(sa.sin_addr));
+
+                     // now get it back and print it
+                     inet_ntop(AF_INET, &(peer[fnum].address.sin_addr), addr_str, INET_ADDRSTRLEN);
+                     
+                     memcpy(sendData, &peerID, 4);
+                     memcpy(sendData+4, &addr_str, 4);
+                     memcpy(sendData+8, ntohs(peer[fnum].address.sin_port), 2);
+                     // memcpy(sendData+4,&peer[fnum].address.sin_addr,4);
+                     memcpy(sendData+8, &peer[fnum].address.sin_port, 2);
+                     // printf("%d\n", peer[fnum].id);
+                     // printf("%d\n", ntohs(peer[fnum].address.sin_port));
+                     // printf("%s\n", inet_ntoa(peer[fnum].address.sin_addr));
+                     // printf("%d\n", sendData[4]);
+                     // printf("%d\n", sendData[3]);
+                     for(int i=0; i<10;i++){
+                        printf("%d\n", sendData[i]);
+                     }
+                     int size = sizeof(sendData);
+                     if((sendall(new_sd, sendData, &size)) == -1)
+                        {
+                                 printf("error\n");
+                                 exit(1);
+                        }
+                  }
                }
                // memcpy(&ipAddr, buffer+4, 4);
                // memcpy(&port, buffer+8, 2);
@@ -349,4 +398,24 @@ main (int argc, char *argv[])
       if (FD_ISSET(i, &master_set))
          close(i);
    }
+}
+
+
+// Function to deal with partial send --- from Beej's guide on Partial send()/recv()
+int sendall(int s, char* buf, int* len)
+{
+        int total = 0;        // how many bytes we've sent
+        int bytesleft = *len; // how many we have left to send
+        int n;
+
+        while (total < *len) {
+                n = send(s, buf + total, bytesleft, 0);
+                if (n == -1) { break;}
+                total = total + n;
+                bytesleft = bytesleft - n;
+        }
+
+        *len = total; // return number actually sent here
+
+        return n == -1 ? -1 : 0; // return -1 on failure, 0 on success
 }
