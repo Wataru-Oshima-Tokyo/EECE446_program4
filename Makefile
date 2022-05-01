@@ -1,11 +1,11 @@
 CC = gcc
 
-all: p4_registry
+all: registry
 
 clean:
-	rm -r p4_registry 
+	rm -r registry 
 
-p4_registry: p4_registry.c
+registry: registry.c
 	$(CC) $@.c -o $@ -Wall
 # ex_registry: ex_registry.c
 # 	$(CC) $@.c -o $@ -Wall
