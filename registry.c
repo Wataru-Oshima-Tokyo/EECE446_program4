@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <dirent.h>
-#define SERVER_PORT  12345
 
 #define TRUE             1
 #define FALSE            0
@@ -36,8 +35,6 @@ void joinFunction(int s, struct peer_entry *peer){
          perror("getpeername");
          exit(EXIT_FAILURE);
       }
-      // printf("Peer IP address: %s\n", inet_ntoa(addr.sin_addr));
-      // printf("Peer port      : %d\n", ntohs(addr.sin_port));
       peer->socket_descriptor = s;
       peer->address.sin_addr = addr.sin_addr;
       peer->address.sin_port = addr.sin_port;
@@ -45,12 +42,9 @@ void joinFunction(int s, struct peer_entry *peer){
 
 void publishFunction(struct peer_entry *peer, char *_buffer){
       int file_count=0;
-      // char temp[255];
-      // memcpy(temp, _buffer+5, strlen(_buffer+5));
       memcpy(&file_count, _buffer+1,4);
       file_count = htonl(file_count);
       printf("%d ", file_count);
-      // int n=0;
       int total_len = 5;
       int _length=strlen(_buffer+5);
       for(int j=0; j<file_count;j++){
@@ -63,8 +57,6 @@ void publishFunction(struct peer_entry *peer, char *_buffer){
 }
 
 int searchFunction(struct peer_entry *peer, char *filename){
-      // memcpy(temp, _buffer+5, strlen(_buffer+5));
-      // printf("%s\n", search_file);
       for(int j =0; j<(sizeof(peer->files)/sizeof(peer->files[0])); j++){
          if(strcmp(filename,peer->files[j])==0)
             return 1;
@@ -91,7 +83,6 @@ int main (int argc, char *argv[])
       exit(1);
    }
    /*************************************************************/
-   /* Create an AF_INET6 stream socket to receive incoming      */
    /* connections on                                            */
    /*************************************************************/
    listen_sd = socket(AF_INET, SOCK_STREAM, 0);
@@ -128,7 +119,6 @@ int main (int argc, char *argv[])
    /*************************************************************/
    /* Bind the socket                                           */
    /*************************************************************/
-   // memset(&addr, 0, sizeof(addr));
       memset( &addr, 0, sizeof( addr ) );
       addr.sin_family = AF_INET;
       addr.sin_addr.s_addr = INADDR_ANY;
@@ -173,9 +163,9 @@ int main (int argc, char *argv[])
       memcpy(&working_set, &master_set, sizeof(master_set));
 
       /**********************************************************/
-      /* Call select() and wait 3 minutes for it to complete.   */
+      /* Call select()                                          */
       /**********************************************************/
-      rc = select(max_sd + 1, &working_set, NULL, NULL,NULL);
+      rc = select(max_sd + 1, &working_set, NULL, NULL, NULL);
 
          /**********************************************************/
          /* Check to see if the select call failed.                */
@@ -273,7 +263,6 @@ int main (int argc, char *argv[])
                   if (close_conn)
                   {
                      struct peer_entry temp[5] = {0};
-                     //   printf("%d\n", i);
                         int _count=0;
                         for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
                            if(peer[j].socket_descriptor != i){
