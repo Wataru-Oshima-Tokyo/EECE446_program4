@@ -40,8 +40,7 @@ void joinFunction(int s, struct peer_entry *peer){
       // printf("Peer port      : %d\n", ntohs(addr.sin_port));
       peer->socket_descriptor = s;
       peer->address.sin_addr = addr.sin_addr;
-      // peer->address.sin_port = addr.sin_port;
-      peer->address.sin_port = ntohs(addr.sin_port);
+      peer->address.sin_port = addr.sin_port;
 }
 
 void publishFunction(struct peer_entry *peer, char *_buffer){
@@ -265,6 +264,39 @@ int main (int argc, char *argv[])
                   /* before we loop back and call select again.    */
                   /*************************************************/
                   rc = recv(i, buffer, sizeof(buffer), 0);
+
+                  if(rc==0){
+                    printf("  Connection closed\n");
+                    close_conn = TRUE;
+                  }
+                
+                  if (close_conn)
+                  {
+                     struct peer_entry temp[5] = {0};
+                     //   printf("%d\n", i);
+                        int _count=0;
+                        for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
+                           if(peer[j].socket_descriptor != i){
+                              temp[_count] = peer[j];
+                              _count++;
+                           }
+                        }
+                     
+                     num_peer = _count;
+                     memcpy(&peer, &temp, sizeof(temp));
+                     close(i);
+                     FD_CLR(i, &master_set);
+                     if (i == max_sd)
+                     {
+                           while (FD_ISSET(max_sd, &master_set) == FALSE)
+                              max_sd -= 1;
+                     }
+                     continue;
+                  }
+
+
+
+
                      if (rc < 0)
                      {
                         if (errno != EWOULDBLOCK)
@@ -317,7 +349,6 @@ int main (int argc, char *argv[])
                         char temp[255] ={0};
                         memcpy(&temp, buffer+1, strlen(buffer+1));
                         printf("TEST] SEARCH %s", temp);
-                        printf("\n");
                         int fnum=-1;
                         for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
                            if(searchFunction(&peer[j],temp)>0){
@@ -329,14 +360,17 @@ int main (int argc, char *argv[])
                         char sendData[10] ={0};
                         int size = sizeof(sendData);
                         if(fnum>=0){
-                           // puts("here\n");
-                           // int port = htons(peer[fnum].address.sin_port);
                            char addr_str[INET_ADDRSTRLEN];
                            inet_ntop(AF_INET, &(peer[fnum].address.sin_addr), addr_str, INET_ADDRSTRLEN);
                            memcpy(sendData, &peer[fnum].id, 4);
                            memcpy(sendData+4, &(peer[fnum].address.sin_addr), 4);
                            memcpy(sendData+8, &peer[fnum].address.sin_port, 2);
-
+                           long int _peerID = htonl(peer[fnum].id);
+                           printf(" %ld ", _peerID);
+                           printf("%s:", inet_ntoa(peer[fnum].address.sin_addr));
+                           printf("%d\n", ntohs(peer[fnum].address.sin_port));
+                        }else{
+                           printf(" 0 0.0.0.0:0\n");
                         }
                         if((sendall(i, sendData, &size)) == -1)
                         {
@@ -345,33 +379,7 @@ int main (int argc, char *argv[])
                         }
                      }
                   
-                if(rc==0){
-                    printf("  Connection closed\n");
-                    close_conn = TRUE;
-                }
-                
-                if (close_conn)
-                {
-                   struct peer_entry temp[5] = {0};
-                  //   printf("%d\n", i);
-                     int _count=0;
-                     for(int j=0; j<sizeof(peer)/sizeof(peer[0]);j++){
-                        if(peer[j].socket_descriptor != i){
-                           temp[_count] = peer[j];
-                           _count++;
-                        }
-                     }
-                    
-                    num_peer = _count;
-                    memcpy(&peer, &temp, sizeof(temp));
-                    close(i);
-                    FD_CLR(i, &master_set);
-                    if (i == max_sd)
-                    {
-                        while (FD_ISSET(max_sd, &master_set) == FALSE)
-                            max_sd -= 1;
-                    }
-                }
+
             } /* End of existing connection is readable */
          } /* End of if (FD_ISSET(i, &working_set)) */
       } /* End of loop through selectable descriptors */
@@ -380,11 +388,11 @@ int main (int argc, char *argv[])
    /*************************************************************/
    /* Clean up all of the sockets that are open                 */
    /*************************************************************/
-   for (i=0; i <= max_sd; ++i)
-   {
-      if (FD_ISSET(i, &master_set))
-         close(i);
-   }
+   // for (i=0; i <= max_sd; ++i)
+   // {
+   //    if (FD_ISSET(i, &master_set))
+   //       close(i);
+   // }
 
    return 0;
 }
